@@ -1,5 +1,4 @@
 // api/chat.js - Rota Serverless para processamento de IA (Gemini API Proxy)
-import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
   // CORS Headers simples para permitir chamadas locais e do domínio oficial
