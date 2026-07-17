@@ -1,6 +1,13 @@
-// api/chat.js - Rota Serverless para processamento de IA (Abacus.ai RouteLLM API)
-// ATENÇÃO: configure a variável de ambiente ABACUS_API_KEY no Vercel (ambiente Production).
+// api/chat.js - Rota Serverless para processamento de IA (OpenRouter API — tier gratuito)
+// ATENÇÃO: configure a variável de ambiente OPENROUTER_API_KEY no Vercel (ambiente Production).
 // Não deixe chaves hardcoded no código.
+//
+// Opcionais:
+//   SITE_URL  -> ex.: https://aliviodaalma.com.br
+//   SITE_NAME -> ex.: Alívio da Alma
+//
+// Para aumentar de fato a cota diária (50 -> 1000 req/dia), compre US$10 de crédito
+// uma única vez em https://openrouter.ai/credits (não expira, é decisão de conta, não de código).
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,10 +24,9 @@ export default async function handler(req, res) {
 
   const { prompt } = req.body;
 
-  // Leitura estrita da chave da Abacus.ai da variável de ambiente
-  const apiKey = process.env.ABACUS_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Configuração ausente: variável de ambiente ABACUS_API_KEY não definida.' });
+    return res.status(500).json({ error: 'Configuração ausente: variável de ambiente OPENROUTER_API_KEY não definida.' });
   }
 
   if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -37,12 +43,10 @@ export default async function handler(req, res) {
   const foundRisk = riskKeywords.some(k => promptLower.includes(k));
 
   if (foundRisk) {
-    // Resposta de segurança imediata — deve ser priorizada e enviada sem conteúdo devocional
     const safetyReply = `Se você está em risco imediato ou pensando em se machucar, entre em contato agora com o CVV (Centro de Valorização da Vida) pelo número 188, ou ligue para o serviço de emergência local. Procure ajuda profissional imediatamente. Se possível, converse com alguém de confiança neste momento.`;
     return res.status(200).json({ reply: safetyReply, safety: true });
   }
 
-  // System prompt fixo (regra de 4 passos + restrições)
   const systemPrompt = `
 Siga sempre a estrutura de 4 passos em TODAS as respostas:
 
@@ -62,66 +66,95 @@ Restrições obrigatórias:
 Responda em português.
 `.trim();
 
-  // --- CORREÇÃO 1: base URL correta do RouteLLM (Self-Serve) ---
-  const url = 'https://routellm.abacus.ai/v1/chat/completions';
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  // --- CORREÇÃO 3: modelo válido no catálogo atual do RouteLLM ---
-  const model = process.env.ABACUS_MODEL || 'route-llm';
+  // Cadeia de fallback: se o roteador automático ou um modelo específico estiver
+  // sobrecarregado (429), tenta o próximo da lista antes de desistir.
+  // A lista de modelos :free muda com o tempo — confira a atual em openrouter.ai/models?max_price=0
+  const FALLBACK_MODELS = [
+    process.env.OPENROUTER_MODEL || 'openrouter/free',
+    'deepseek/deepseek-chat-v3-0324:free',
+    'meta-llama/llama-4-maverick:free',
+    'google/gemini-2.0-flash-exp:free'
+  ];
 
-  const payload = {
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: prompt }
-    ],
-    temperature: 0.2,
-    max_tokens: 400
-  };
+  async function callOpenRouter(model, prompt) {
+    const payload = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 400
+    };
 
-  try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // --- CORREÇÃO 2: header de autenticação correto do RouteLLM ---
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': process.env.SITE_URL || 'https://aliviodaalma.com.br',
+        'X-Title': process.env.SITE_NAME || 'Alívio da Alma'
       },
       body: JSON.stringify(payload)
     });
 
+    return response;
+  }
+
+  try {
+    let response = null;
+    let lastErrText = '';
+    let lastStatus = 500;
+
+    for (const model of FALLBACK_MODELS) {
+      response = await callOpenRouter(model, prompt);
+
+      if (response.ok) break; // sucesso, sai do loop
+
+      lastStatus = response.status;
+      lastErrText = await response.text();
+      console.error(`Erro OpenRouter (modelo ${model}):`, lastStatus, lastErrText);
+
+      // 429 = rate limit / sobrecarga: tenta o próximo modelo da lista.
+      // Qualquer outro erro (401, 400, etc.) não vai se resolver trocando de modelo: para o loop.
+      if (lastStatus !== 429) break;
+    }
+
     if (!response.ok) {
-      const errText = await response.text();
-      console.error('Erro RouteLLM (Abacus API):', response.status, errText);
-      return res.status(response.status).json({ error: 'Erro na API do Abacus.ai (RouteLLM): ' + errText });
+      // Mensagem amigável para rate limit; técnica para os demais casos (aparece nos logs da Vercel)
+      if (lastStatus === 429) {
+        return res.status(429).json({
+          error: 'Estamos com alta demanda no momento. Por favor, aguarde um instante e tente novamente.'
+        });
+      }
+      return res.status(lastStatus).json({ error: 'Erro na API do OpenRouter: ' + lastErrText });
     }
 
     const data = await response.json();
 
-    // Compatibilidade com estrutura de resposta OpenAI-compatible
     let replyText = '';
     if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
       replyText = data.choices[0].message.content;
     } else if (data.choices && data.choices[0] && data.choices[0].text) {
-      // fallback para algumas APIs que retornam text
       replyText = data.choices[0].text;
     } else if (data.error) {
-      console.error('Resposta inesperada da API Abacus:', data);
-      return res.status(500).json({ error: 'Resposta inesperada da API Abacus.' });
+      console.error('Resposta inesperada da API OpenRouter:', data);
+      return res.status(500).json({ error: 'Resposta inesperada da API OpenRouter.' });
     } else {
       replyText = '';
     }
 
-    // Segurança adicional: caso o modelo tente incluir instruções clínicas ou diagnóstico, removemos
     const forbiddenClinical = [/diagnóstico/i, /avaliação de risco/i, /tracei um plano/i];
     const hasForbidden = forbiddenClinical.some(rx => rx.test(replyText));
     if (hasForbidden) {
-      // Substitui por mensagem neutra reforçando busca por ajuda profissional
       replyText = 'Sinto muito que você esteja passando por isso. Recomendo que procure ajuda profissional imediatamente. Se estiver em risco, ligue para o CVV (188) ou o serviço de emergência local.';
     }
 
     return res.status(200).json({ reply: replyText, safety: false });
   } catch (error) {
-    console.error('Erro na função Serverless Abacus:', error);
+    console.error('Erro na função Serverless OpenRouter:', error);
     return res.status(500).json({ error: 'Erro interno ao processar a mensagem: ' + error.message });
   }
 }
