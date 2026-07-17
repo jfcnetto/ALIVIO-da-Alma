@@ -1,6 +1,7 @@
 // api/chat.js - Rota Serverless para processamento de IA (OpenRouter API — tier gratuito)
 // ATENÇÃO: configure a variável de ambiente OPENROUTER_API_KEY no Vercel (ambiente Production).
 // Não deixe chaves hardcoded no código.
+
 //
 // Opcionais:
 //   SITE_URL  -> ex.: https://aliviodaalma.com.br
@@ -74,11 +75,12 @@ RESTRIÇÕES:
   // Cadeia de fallback: se o roteador automático ou um modelo específico estiver
   // sobrecarregado (429), tenta o próximo da lista antes de desistir.
   // A lista de modelos :free muda com o tempo — confira a atual em openrouter.ai/models?max_price=0
+  // Lista atualizada de modelos gratuitos ativos no OpenRouter
   const FALLBACK_MODELS = [
     process.env.OPENROUTER_MODEL || 'openrouter/free',
-    'deepseek/deepseek-chat-v3-0324:free',
-    'meta-llama/llama-4-maverick:free',
-    'google/gemini-2.0-flash-exp:free'
+    'google/gemini-2.5-flash:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'meta-llama/llama-3-8b-instruct:free'
   ];
 
   async function callOpenRouter(model, prompt) {
@@ -112,27 +114,29 @@ RESTRIÇÕES:
     let lastStatus = 500;
 
     for (const model of FALLBACK_MODELS) {
-      response = await callOpenRouter(model, prompt);
-
-      if (response.ok) break; // sucesso, sai do loop
-
-      lastStatus = response.status;
-      lastErrText = await response.text();
-      console.error(`Erro OpenRouter (modelo ${model}):`, lastStatus, lastErrText);
-
-      // 429 = rate limit / sobrecarga: tenta o próximo modelo da lista.
-      // Qualquer outro erro (401, 400, etc.) não vai se resolver trocando de modelo: para o loop.
-      if (lastStatus !== 429) break;
-    }
-
-    if (!response.ok) {
-      // Mensagem amigável para rate limit; técnica para os demais casos (aparece nos logs da Vercel)
-      if (lastStatus === 429) {
-        return res.status(429).json({
-          error: 'Estamos com alta demanda no momento. Por favor, aguarde um instante e tente novamente.'
-        });
+      try {
+        response = await callOpenRouter(model, prompt);
+        lastStatus = response.status;
+        
+        if (response.ok) break; // Sucesso, sai do loop
+        
+        lastErrText = await response.text();
+        console.error(`Erro OpenRouter (modelo ${model}):`, lastStatus, lastErrText);
+      } catch (err) {
+        lastStatus = 500;
+        lastErrText = err.message;
+        console.error(`Erro de conexão OpenRouter (modelo ${model}):`, err);
       }
-      return res.status(lastStatus).json({ error: 'Erro na API do OpenRouter: ' + lastErrText });
+      
+      // Continua o loop para tentar o próximo modelo em QUALQUER erro (429, 404, 503, etc.)
+    }
+    // Se TODOS os modelos falharam (créditos esgotados, API offline, etc.)
+    if (!response || !response.ok) {
+      console.error('Todos os modelos falharam. Status:', lastStatus, 'Detalhes:', lastErrText);
+      return res.status(200).json({
+        reply: 'Nosso serviço de IA está temporariamente indisponível. Por favor, tente novamente em alguns instantes.',
+        safety: false
+      });
     }
 
     const data = await response.json();
