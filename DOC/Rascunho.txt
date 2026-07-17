@@ -1,3 +1,5 @@
 git remote add origin https://github.com/jfcnetto/ALIVIO-da-Alma
 
-https://openrouter.ai/
+https://openrouter.ai/ghhkd
+https://alivio-da-alma.vercel.app/
+
