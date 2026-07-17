@@ -10,13 +10,18 @@
 <body>
   <header>
     <div class="logo-container">
-      <img src="logo_alivio_alma.png" alt="Logo ALIVIO da Alma" class="logo-img">
+      <img src="logo_alivio_alma.svg" alt="Logo ALIVIO da Alma" class="logo-img">
       <span class="logo-text">ALIVIO da Alma</span>
     </div>
   </header>
 
-  <main style="display: block;">
-    <div class="page-container">
+  <!-- Bloco de Anuncio Topo (728x90) -->
+  <div id="gptTopAd" class="ad-container ad-top">
+    <img src="ad_banner_topo.svg" alt="Anúncio AdSense Topo">
+  </div>
+
+  <main style="display: grid; grid-template-columns: 1fr 320px; max-width: 1440px; width: 100%; margin: 0 auto; padding: 1.5rem; gap: 1.5rem;">
+    <div class="page-container" style="margin: 0; max-width: 100%;">
       <h1 class="page-title">Política de Privacidade</h1>
       <div class="page-content">
         <p>A sua privacidade é de extrema importância para nós. No <strong>ALIVIO da Alma</strong>, operamos sob a política de transparência e respeito à privacidade dos dados de nossos usuários.</p>
@@ -35,10 +40,27 @@
         <a href="index.html" class="back-btn">← Voltar para o Acolhimento</a>
       </div>
     </div>
+
+    <!-- Barra Lateral Padronizada com Anúncio AdSense -->
+    <aside class="sidebar">
+      <div class="card">
+        <h3 class="card-title">📖 Reflexão</h3>
+        <p class="card-content">A leitura dos termos e políticas garante a transparência da nossa caminhada. Aqui a sua voz é ouvida, mas o silêncio e o sigilo são guardados.</p>
+      </div>
+
+      <div id="gptSidebarAd" class="ad-container ad-sidebar">
+        <img src="ad_banner_lateral.svg" alt="Anúncio AdSense Lateral">
+      </div>
+    </aside>
   </main>
 
   <footer>
-    <p>&copy; 2026 ALIVIO da Alma (aliviodaalma.com.br). Todos os direitos reservados.</p>
+    <div class="footer-links">
+      <a href="politica-de-privacidade.html">Política de Privacidade</a>
+      <a href="termos-de-uso.html">Termos de Uso</a>
+      <a href="contato.html">Contato</a>
+    </div>
+    <p>&copy; 2026 ALIVIO da Alma (aliviodaalma.com.br). Todos os direitos reservados. IA operando localmente no navegador.</p>
   </footer>
 </body>
 </html>
