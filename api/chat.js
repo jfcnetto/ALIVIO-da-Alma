@@ -79,7 +79,7 @@ Responda em português.
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'apiKey': apiKey
       },
       body: JSON.stringify(payload)
     });
