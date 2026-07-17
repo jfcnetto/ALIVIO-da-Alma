@@ -56,7 +56,9 @@ Você é um conselheiro de apoio emocional do ALIVIO da Alma. Escute com empatia
 RESTRIÇÕES:
 - Sem diagnósticos ou linguagem clínica.
 - Se houver sofrimento intenso, sugira buscar um profissional.
-- Em menção de suicídio ou autoagressão, retorne APENAS mensagem de emergência com CVV 188.`;
+- Se o usuário mencionar "morrer", "vontade de morrer" ou dor extrema pela PRIMEIRA vez: acolha com empatia e mude o assunto naturalmente, direcionando para algo positivo ou para o que a pessoa ainda valoriza na vida. NÃO mencione CVV neste momento.
+- Se o usuário VOLTAR a falar sobre morrer ou o tema persistir: aí sim, mencione o CVV 188 de forma sutil e breve (ex: "sabia que o CVV 188 pode te ouvir a qualquer hora?"), sem transformar a conversa num aviso repetitivo.
+- O foco é SEMPRE manter o diálogo vivo, acolhedor e humano.`;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {

@@ -33,17 +33,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Corpo da requisição inválido: prompt ausente.' });
   }
 
-  // Lista simples de palavras-chave sinalizando ideação suicida / autoagressão ou risco iminente
+  // Bloqueio HARD apenas para frases de risco iminente inequívoco.
+  // Frases ambíguas ("vontade de morrer", "morrer") são tratadas pelo modelo com acolhimento.
   const riskKeywords = [
-    'suicídio', 'suicidio', 'me matar', 'quero morrer', 'quero me matar', 'acabar com minha vida',
-    'me machucar', 'me ferir', 'tirar a minha vida', 'ideação suicida', 'ideacao suicida', 'me matar hoje'
+    'quero me matar', 'vou me matar', 'me matar hoje', 'me matar agora',
+    'vou me suicidar', 'vou cometer suicídio', 'tentei suicídio', 'tentei me matar',
+    'planejando me matar', 'acabar com minha vida agora'
   ];
 
-  const promptLower = prompt.toLowerCase();
+  const promptLower = prompt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const foundRisk = riskKeywords.some(k => promptLower.includes(k));
 
   if (foundRisk) {
-    const safetyReply = `Se você está em risco imediato ou pensando em se machucar, entre em contato agora com o CVV (Centro de Valorização da Vida) pelo número 188, ou ligue para o serviço de emergência local. Procure ajuda profissional imediatamente. Se possível, converse com alguém de confiança neste momento.`;
+    const safetyReply = `Eu ouço a sua dor e me preocupo com você. Por favor, ligue agora para o CVV (188) — é gratuito, sigiloso e funciona 24h. Se estiver em risco imediato, chame o SAMU (192). Você não precisa enfrentar isso sozinho. Estou aqui quando quiser continuar conversando.`;
     return res.status(200).json({ reply: safetyReply, safety: true });
   }
 
@@ -62,7 +64,9 @@ Você é um conselheiro de apoio emocional do ALIVIO da Alma. Escute com empatia
 RESTRIÇÕES:
 - Sem diagnósticos ou linguagem clínica.
 - Se houver sofrimento intenso, sugira buscar um profissional.
-- Em menção de suicídio ou autoagressão, retorne APENAS mensagem de emergência com CVV 188.
+- Se o usuário mencionar "morrer", "vontade de morrer" ou dor extrema pela PRIMEIRA vez: acolha com empatia e mude o assunto naturalmente, direcionando para algo positivo ou para o que a pessoa ainda valoriza na vida. NÃO mencione CVV neste momento.
+- Se o usuário VOLTAR a falar sobre morrer ou o tema persistir: aí sim, mencione o CVV 188 de forma sutil e breve (ex: "sabia que o CVV 188 pode te ouvir a qualquer hora?"), sem transformar a conversa num aviso repetitivo.
+- O foco é SEMPRE manter o diálogo vivo, acolhedor e humano.
 `.trim();
 
   const url = 'https://openrouter.ai/api/v1/chat/completions';
