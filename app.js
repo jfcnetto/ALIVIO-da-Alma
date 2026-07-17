@@ -149,27 +149,22 @@ async function checkAiAvailability() {
 
 // Fallback gratuito da API do Gemini via HTTP (Serverless Proxy)
 async function callGeminiFallbackAPI(promptWithContext) {
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: SYSTEM_PROMPT + "\n\nHistórico e conversa:\n" + promptWithContext })
-    });
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: promptWithContext })
+  });
 
-    if (!response.ok) {
-      throw new Error('Falha no gateway do chat');
-    }
+  if (!response.ok) {
+    const errData = await response.json();
+    throw new Error(errData.error || 'Falha no gateway do chat');
+  }
 
-    const data = await response.json();
-    if (data.reply) {
-      return data.reply;
-    } else {
-      throw new Error('Resposta do gateway vazia');
-    }
-  } catch (e) {
-    console.error("Falha ao contactar o proxy serverless do Gemini:", e);
-    // Retorna uma mensagem de simulação amigável local caso o proxy não esteja hospedado ainda
-    return simulateFaithfulResponse(promptWithContext);
+  const data = await response.json();
+  if (data.reply) {
+    return data.reply;
+  } else {
+    throw new Error('Resposta do gateway vazia');
   }
 }
 
