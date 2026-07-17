@@ -145,6 +145,27 @@ RESTRIÇÕES:
       replyText = '';
     }
 
+    // ── Sanitização: remove lixo/metadados que modelos gratuitos às vezes vazam ──
+    const junkPatterns = [
+      /User Safety\s*:\s*\w+/gi,                  // "User Safety: safe"
+      /Safety\s*:\s*\w+/gi,                        // "Safety: safe"
+      /\bsafe\b\s*$/gi,                            // "safe" solto no final
+      /Content Safety\s*:\s*\w+/gi,                // "Content Safety: safe"
+      /\[?\/?INST\]?/gi,                           // tokens de instrução [INST] [/INST]
+      /<\|.*?\|>/g,                                // tokens especiais <|end|>, <|assistant|>
+      /```[\s\S]*?```/g,                           // blocos de código acidentais
+      /^(Step|Passo|Check|Note|Let me|We need|We must|I need|I will|Here)[^\n]*$/gim,  // raciocínio interno em inglês
+      /^\s*\d+\)\s*(Acolhimento|Conforto|Elemento|Reflexão)[^\n]*$/gim,               // rótulos de passos
+      /---+/g,                                     // separadores
+    ];
+
+    for (const pattern of junkPatterns) {
+      replyText = replyText.replace(pattern, '');
+    }
+
+    // Remove linhas em branco extras resultantes da limpeza
+    replyText = replyText.replace(/\n{3,}/g, '\n\n').trim();
+
     const forbiddenClinical = [/diagnóstico/i, /avaliação de risco/i, /tracei um plano/i];
     const hasForbidden = forbiddenClinical.some(rx => rx.test(replyText));
     if (hasForbidden) {
