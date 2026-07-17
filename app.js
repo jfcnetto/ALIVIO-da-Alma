@@ -297,7 +297,7 @@ async function sendMessage() {
   } catch (err) {
     console.error('Erro na resposta da IA (Híbrida):', err);
     removeTypingIndicator();
-    appendMessage('error', 'Desculpe, ocorreu uma oscilação na conexão. Gostaria de tentar novamente?');
+    appendMessage('error', `Erro Técnico Detalhado: ${err.message || err}. (Verifique o console do navegador F12 ou logs da Vercel para mais detalhes).`);
   }
 }
 
