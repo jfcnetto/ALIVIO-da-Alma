@@ -1,5 +1,5 @@
-// api/chat.js - Rota Serverless para processamento de IA (Abacus.ai API Gateway)
-// ATENÇÃO: configure a variável de ambiente ABACUS_API_KEY no Vercel.
+// api/chat.js - Rota Serverless para processamento de IA (Abacus.ai RouteLLM API)
+// ATENÇÃO: configure a variável de ambiente ABACUS_API_KEY no Vercel (ambiente Production).
 // Não deixe chaves hardcoded no código.
 
 export default async function handler(req, res) {
@@ -62,10 +62,14 @@ Restrições obrigatórias:
 Responda em português.
 `.trim();
 
-  // Payload para a API Abacus.ai (OpenAI-compatible). Ajuste "model" conforme sua conta.
-  const url = 'https://api.abacus.ai/v1/chat/completions';
+  // --- CORREÇÃO 1: base URL correta do RouteLLM (Self-Serve) ---
+  const url = 'https://routellm.abacus.ai/v1/chat/completions';
+
+  // --- CORREÇÃO 3: modelo válido no catálogo atual do RouteLLM ---
+  const model = process.env.ABACUS_MODEL || 'route-llm';
+
   const payload = {
-    model: 'gemini-1.5-flash', // ALTERE para o ID do modelo disponível na sua conta Abacus.ai se necessário
+    model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: prompt }
@@ -79,15 +83,16 @@ Responda em português.
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apiKey': apiKey
+        // --- CORREÇÃO 2: header de autenticação correto do RouteLLM ---
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('Erro Abacus API:', response.status, errText);
-      return res.status(response.status).json({ error: 'Erro na API do Abacus.ai: ' + errText });
+      console.error('Erro RouteLLM (Abacus API):', response.status, errText);
+      return res.status(response.status).json({ error: 'Erro na API do Abacus.ai (RouteLLM): ' + errText });
     }
 
     const data = await response.json();
