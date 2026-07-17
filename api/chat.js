@@ -150,6 +150,42 @@ RESTRIÇÕES:
     }
 
     // ── Sanitização: remove lixo/metadados que modelos gratuitos às vezes vazam ──
+    // Se a resposta contiver raciocínio do modelo (ex: "Okay, the user said..." ou "First, check the rules"),
+    // nós procuramos separar o raciocínio da resposta final real do modelo.
+    // Muitos modelos de 'Thinking' (como o DeepSeek R1 ou similar) usam tags <think>...</think>.
+    // Modelos que não usam tags às vezes listam o raciocínio no começo e a resposta no final entre aspas ou após quebras de linha.
+    
+    // 1. Remover tag <think>...</think> se existir
+    replyText = replyText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    // 2. Se houver um padrão clássico de texto em inglês analisando as regras (raciocínio exposto sem tags)
+    // Procuramos a última parte que realmente se pareça com a resposta final em português.
+    // Exemplo: se houver "Final response:", "Possible response:" ou frases longas em inglês antes de uma frase em português.
+    if (/[a-zA-Z]{4,}\s+said\s+/i.test(replyText) || /check\s+the\s+rules/i.test(replyText) || /Structure:/i.test(replyText)) {
+      // Se detectarmos raciocínio em inglês, vamos tentar encontrar a parte em português que está entre aspas
+      // ou após o último parágrafo em inglês.
+      const quotesMatch = replyText.match(/"([^"]{10,})"/g);
+      if (quotesMatch && quotesMatch.length > 0) {
+        // Pega a última frase entre aspas que seja em português
+        replyText = quotesMatch[quotesMatch.length - 1].replace(/"/g, '');
+      } else {
+        // Fallback: se houver linhas em português no final, vamos isolar
+        const paragraphs = replyText.split('\n');
+        const portugueseParagraphs = paragraphs.filter(p => {
+          const cleanP = p.trim();
+          if (cleanP.length < 5) return false;
+          // Se tiver muitas palavras em inglês comuns nas instruções, descarta
+          if (/user\s+said|first\s+check|rules:|Brazilian\s+Portuguese|reflective\s+question|biblical\s+verse|emergency\s+message/i.test(cleanP)) {
+            return false;
+          }
+          return true;
+        });
+        if (portugueseParagraphs.length > 0) {
+          replyText = portugueseParagraphs[portugueseParagraphs.length - 1];
+        }
+      }
+    }
+
     const junkPatterns = [
       /User Safety\s*:\s*\w+/gi,                  // "User Safety: safe"
       /Safety\s*:\s*\w+/gi,                        // "Safety: safe"
@@ -158,7 +194,7 @@ RESTRIÇÕES:
       /\[?\/?INST\]?/gi,                           // tokens de instrução [INST] [/INST]
       /<\|.*?\|>/g,                                // tokens especiais <|end|>, <|assistant|>
       /```[\s\S]*?```/g,                           // blocos de código acidentais
-      /^(Step|Passo|Check|Note|Let me|We need|We must|I need|I will|Here)[^\n]*$/gim,  // raciocínio interno em inglês
+      /^(Step|Passo|Check|Note|Let me|We need|We must|I need|I will|Here|Possible response|Final response|Structure)[^\n]*$/gim,  // raciocínio interno em inglês
       /^\s*\d+\)\s*(Acolhimento|Conforto|Elemento|Reflexão)[^\n]*$/gim,               // rótulos de passos
       /---+/g,                                     // separadores
     ];
@@ -169,6 +205,12 @@ RESTRIÇÕES:
 
     // Remove linhas em branco extras resultantes da limpeza
     replyText = replyText.replace(/\n{3,}/g, '\n\n').trim();
+
+    // Se após toda a limpeza a resposta ficou vazia ou muito curta, coloque um fallback amigável 
+    // em vez de quebrar ou dar erro de "Resposta do gateway vazia"
+    if (!replyText || replyText.length < 5) {
+      replyText = "Compreendo perfeitamente o que você está compartilhando. Gostaria de me contar um pouco mais sobre como tem lidado com isso no seu dia a dia?";
+    }
 
     const forbiddenClinical = [/diagnóstico/i, /avaliação de risco/i, /tracei um plano/i];
     const hasForbidden = forbiddenClinical.some(rx => rx.test(replyText));
